@@ -2,7 +2,8 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-
+from torchvision.transforms import functional as F
+import torch
 
 class DataSet_V2:
     def __init__(self, root_dir, batch_size, shuffle, num_workers, istrainning):
@@ -22,36 +23,35 @@ class DataSet_V2:
         if not self.istrainning:
             return transforms.Compose([
                 transforms.Lambda(self.convert_img),
-                #transforms.Grayscale(num_output_channels=3),
-                #transforms.RandomAffine(degrees=45, translate=(0.1, 0.1), scale=(1, 1)),# 转换为灰度图
                 transforms.ToTensor(),
-
                 transforms.Resize(size=(224, 224), antialias=True),
-                #transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
             ])
         else:
             return transforms.Compose([
                 transforms.Lambda(self.convert_img),
-                # 随机水平翻转输入图像
-                #transforms.Grayscale(num_output_channels=3),
-                #transforms.RandomHorizontalFlip(p=0.4),
-                # 随机改变图像的亮度、对比度、饱和度和色调等属性，从而增加数据样本的多样性
-                #transforms.ColorJitter(),
-                # 将给定图像随机裁剪为不同的大小和宽高比，然后缩放所裁剪得到的图像为指定的大小；（即先随机采集，然后对裁剪得到的图像缩放为同一大小）
-                # 默认scale = (0.08, 1.0)
-                #transforms.RandomResizedCrop(size=224, scale=(0.72, 1.28)),
-                #transforms.RandomAffine(degrees=45, translate=(0.1, 0.1), scale=(1, 1)),
-
+                transforms.RandomHorizontalFlip(p=0.4),
+                transforms.Lambda(lambda img: self.add_random_noise(img)),
                 transforms.ToTensor(),
                 transforms.Resize(size=(224, 224), antialias=True),
-                #transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-
             ])
 
     @staticmethod
-    def convert_img(img):
+    def add_random_noise(img):
+        """
+        向图像添加随机噪声
+        :param img: PIL.Image 输入图像
+        :return: 含噪声的 PIL.Image 图像
+        """
+        img_tensor = F.to_tensor(img)
+        noise = torch.randn_like(img_tensor) * 0.1
+        noisy_img_tensor = img_tensor + noise
+        noisy_img_tensor = torch.clamp(noisy_img_tensor, 0, 1)
+        return F.to_pil_image(noisy_img_tensor)
 
+    @staticmethod
+    def convert_img(img):
         return img.convert("RGB")
+
     def __len__(self):
         return len(self.dataset.imgs)
 
@@ -59,16 +59,12 @@ class DataSet_V2:
         for data in self.loader:
             yield data
 
-
+            
 if __name__ == '__main__':
     batch_size = 8
     num_workers = 0
     train_dataset = DataSet_V2('./data/train', batch_size, True, num_workers, istrainning=True)
     test_dataset = DataSet_V2('./data/test', batch_size, False, num_workers, istrainning=False)
-    # print(len(train_dataset))
-    # print(len(test_dataset))
-    # print(len(test_small_dataset))
+
     for inputs, labels in train_dataset:
-        # print(inputs.shape)
-        # print(labels.shape)
         print(labels[0].item())
